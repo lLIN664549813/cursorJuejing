@@ -1,0 +1,74 @@
+'''
+Description: Zhanglin Create File
+Version: 1.0
+Author: Zhanglin
+Date: 2025-03-05 10:09:33
+LastEditors: Zhanglin
+LastEditTime: 2025-03-05 10:10:30
+'''
+import requests
+import json
+import os
+from datetime import datetime
+
+class JuejinCheckIn:
+    def __init__(self):
+        self.session = requests.session()
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Content-Type": "application/json",
+        }
+        self.cookie = os.environ.get("JUEJIN_COOKIE", "")
+        if not self.cookie:
+            raise ValueError("请设置JUEJIN_COOKIE环境变量")
+        
+        self.headers["Cookie"] = self.cookie
+
+    def check_in(self):
+        """执行签到操作"""
+        url = "https://api.juejin.cn/growth_api/v1/check_in"
+        try:
+            response = self.session.post(url, headers=self.headers)
+            result = response.json()
+            
+            if result.get("err_no") == 0:
+                data = result.get("data", {})
+                return f"签到成功！当前矿石数: {data.get('sum_point')}"
+            else:
+                return f"签到失败：{result.get('err_msg', '未知错误')}"
+        except Exception as e:
+            return f"签到异常：{str(e)}"
+
+    def get_current_point(self):
+        """获取当前矿石数"""
+        url = "https://api.juejin.cn/growth_api/v1/get_cur_point"
+        try:
+            response = self.session.get(url, headers=self.headers)
+            result = response.json()
+            
+            if result.get("err_no") == 0:
+                return result.get("data", 0)
+            return 0
+        except:
+            return 0
+
+def main():
+    try:
+        checkin = JuejinCheckIn()
+        
+        # 获取签到前的矿石数
+        point_before = checkin.get_current_point()
+        
+        # 执行签到
+        result = checkin.check_in()
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {result}")
+        
+        # 获取签到后的矿石数
+        point_after = checkin.get_current_point()
+        print(f"本次签到获得矿石：{point_after - point_before}")
+        
+    except Exception as e:
+        print(f"程序运行异常：{str(e)}")
+
+if __name__ == "__main__":
+    main() 
