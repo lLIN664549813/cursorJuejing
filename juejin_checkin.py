@@ -4,18 +4,22 @@ Version: 1.0
 Author: Zhanglin
 Date: 2025-03-05 10:09:33
 LastEditors: Zhanglin
-LastEditTime: 2025-03-05 15:52:07
+LastEditTime: 2025-03-05 16:36:06
 '''
 import requests
 import json
 import os
 from datetime import datetime
+import re
 
 class JuejinCheckIn:
     def __init__(self):
         self.cookie = os.environ.get("JUEJIN_COOKIE", "")
         if not self.cookie:
             raise ValueError("请设置JUEJIN_COOKIE环境变量")
+        
+        # 从 Cookie 中提取 msToken
+        self.ms_token = self._extract_ms_token(self.cookie)
         
         # 基础请求头
         self.headers = {
@@ -28,9 +32,28 @@ class JuejinCheckIn:
             "Content-Type": "application/json"
         }
 
+    def _extract_ms_token(self, cookie):
+        """从 Cookie 中提取 msToken"""
+        match = re.search(r'msToken=([^;]+)', cookie)
+        return match.group(1) if match else ""
+
     def _make_request(self, method, url, **kwargs):
         """统一的请求处理"""
         try:
+            # 添加安全参数
+            params = kwargs.get('params', {})
+            params.update({
+                "aid": "2608",
+                "uuid": "7434059792458778162",
+                "spider": "0"
+            })
+            
+            # 如果有 msToken，添加到参数中
+            if self.ms_token:
+                params['msToken'] = self.ms_token
+            
+            kwargs['params'] = params
+            
             # 使用 requests 而不是 session，避免 Cookie 被自动处理
             response = requests.request(
                 method=method,
@@ -46,14 +69,9 @@ class JuejinCheckIn:
     def check_in(self):
         """执行签到操作"""
         url = "https://api.juejin.cn/growth_api/v1/check_in"
-        params = {
-            "aid": "2608",
-            "uuid": "7108619669937612289",
-            "spider": "0"
-        }
         
         try:
-            result = self._make_request("POST", url, params=params)
+            result = self._make_request("POST", url)
             
             if result.get("err_no") == 0:
                 data = result.get("data", {})
@@ -66,14 +84,9 @@ class JuejinCheckIn:
     def get_current_point(self):
         """获取当前矿石数"""
         url = "https://api.juejin.cn/growth_api/v1/get_cur_point"
-        params = {
-            "aid": "2608",
-            "uuid": "7108619669937612289",
-            "spider": "0"
-        }
         
         try:
-            result = self._make_request("GET", url, params=params)
+            result = self._make_request("GET", url)
             
             if result.get("err_no") == 0:
                 return result.get("data", 0)
