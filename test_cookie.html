@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>掘金 Cookie 测试工具</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        button {
+            background-color: #1e80ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #1670e5;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .cookie-check {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .cookie-check span {
+            display: inline-block;
+            margin-right: 15px;
+        }
+        .cookie-check .missing {
+            color: #dc3545;
+        }
+        .cookie-check .present {
+            color: #28a745;
+        }
+        #testButton {
+            margin-right: 10px;
+        }
+        #clearButton {
+            background-color: #6c757d;
+        }
+        #clearButton:hover {
+            background-color: #5a6268;
+        }
+        .debug-info {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <h1>掘金 Cookie 测试工具</h1>
+    
+    <div class="container">
+        <h3>使用说明</h3>
+        <ol>
+            <li>将你的掘金 Cookie 完整粘贴到下方文本框</li>
+            <li>点击"测试 Cookie"按钮</li>
+            <li>等待测试结果</li>
+            <li>如果测试成功，即可将此 Cookie 用于自动签到</li>
+        </ol>
+    </div>
+
+    <div class="container">
+        <h3>Cookie 测试</h3>
+        <textarea id="cookieInput" placeholder="在此粘贴你的掘金 Cookie..."></textarea>
+        <div>
+            <button id="testButton" onclick="testCookie()">测试 Cookie</button>
+            <button id="clearButton" onclick="clearInput()">清空输入</button>
+        </div>
+        
+        <div class="cookie-check">
+            <h4>必需字段检查：</h4>
+            <div id="cookieFields"></div>
+        </div>
+        
+        <div id="result"></div>
+        <div id="debugInfo" class="debug-info"></div>
+    </div>
+
+    <script>
+        const requiredFields = ['sessionid', 'uid', 'user_id', '_tea_cookie_tokens'];
+        const testButton = document.getElementById('testButton');
+        const debugInfo = document.getElementById('debugInfo');
+
+        function checkCookieFields(cookieStr) {
+            const fields = {};
+            requiredFields.forEach(field => {
+                fields[field] = cookieStr.includes(field);
+            });
+            return fields;
+        }
+
+        function updateCookieFieldsDisplay(fields) {
+            const container = document.getElementById('cookieFields');
+            container.innerHTML = '';
+            
+            Object.entries(fields).forEach(([field, present]) => {
+                const span = document.createElement('span');
+                span.className = present ? 'present' : 'missing';
+                span.innerHTML = `${field}: ${present ? '✓' : '✗'}`;
+                container.appendChild(span);
+            });
+        }
+
+        function clearInput() {
+            document.getElementById('cookieInput').value = '';
+            document.getElementById('cookieFields').innerHTML = '';
+            document.getElementById('result').className = '';
+            document.getElementById('result').innerHTML = '';
+            debugInfo.textContent = '';
+        }
+
+        async function testCookie() {
+            const cookieStr = document.getElementById('cookieInput').value.trim();
+            const resultDiv = document.getElementById('result');
+            debugInfo.textContent = '';
+            
+            if (!cookieStr) {
+                resultDiv.className = 'error';
+                resultDiv.textContent = '请输入 Cookie！';
+                return;
+            }
+
+            // 检查必需字段
+            const fields = checkCookieFields(cookieStr);
+            updateCookieFieldsDisplay(fields);
+
+            // if (Object.values(fields).some(present => !present)) {
+            //     resultDiv.className = 'error';
+            //     resultDiv.textContent = 'Cookie 缺少必需字段，请确保包含所有必需信息！';
+            //     return;
+            // }
+
+            resultDiv.className = 'warning';
+            resultDiv.textContent = '正在测试...';
+            testButton.disabled = true;
+
+            try {
+                const response = await fetch('/api/test-cookie', {
+                    method: 'GET',
+                    headers: {
+                        'X-Custom-Cookie': cookieStr,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                debugInfo.textContent = '发送请求头：\n' + JSON.stringify({
+                    'X-Custom-Cookie': cookieStr,
+                    'Content-Type': 'application/json'
+                }, null, 2);
+
+                const data = await response.json();
+                debugInfo.textContent += '\n\n响应数据：\n' + JSON.stringify(data, null, 2);
+                
+                if (data.err_no === 0) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <strong>Cookie 有效！</strong><br>
+                        当前矿石数：${data.data}<br>
+                        你可以将此 Cookie 用于自动签到
+                    `;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.textContent = `Cookie 无效：${data.err_msg || '未知错误'}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    测试失败：无法连接到服务器<br>
+                    可能原因：<br>
+                    1. 服务器未启动<br>
+                    2. 网络连接问题<br><br>
+                    请确保服务器已启动并且可以访问
+                `;
+                debugInfo.textContent += '\n\n错误信息：' + error.message;
+            } finally {
+                testButton.disabled = false;
+            }
+        }
+
+        // 添加快捷键支持
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                testCookie();
+            }
+        });
+    </script>
+</body>
+</html> 
